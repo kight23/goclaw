@@ -30,6 +30,8 @@ ui/web/node_modules/
 ui/web/dist/
 ui/web/.vite/
 *.tsbuildinfo
+/home/khoait/goclaw/wwebjs-bot/node_modules/
+/home/khoait/goclaw/wwebjs-bot/dist/
 
 # UI Desktop (Wails + React)
 ui/desktop/frontend/node_modules/
