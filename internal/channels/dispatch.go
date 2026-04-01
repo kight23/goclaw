@@ -22,7 +22,7 @@ type WebhookRoute struct {
 // to the appropriate channel. Internal channels are silently skipped.
 func (m *Manager) dispatchOutbound(ctx context.Context) {
 	slog.Info("outbound dispatcher started")
-
+	
 	for {
 		select {
 		case <-ctx.Done():
@@ -33,7 +33,7 @@ func (m *Manager) dispatchOutbound(ctx context.Context) {
 			if !ok {
 				continue
 			}
-
+			slog.Info("outbound message","msg", msg)
 			// Skip internal channels
 			if IsInternalChannel(msg.Channel) {
 				continue
@@ -76,6 +76,7 @@ func (m *Manager) dispatchOutbound(ctx context.Context) {
 				// Try to send a text-only error notification back to the chat.
 				// Only for media failures — text-only failures likely mean the chat
 				// is inaccessible (kicked, blocked, etc.) so retrying won't help.
+				slog.Debug("sending whatsapp message", "msg", msg)
 				if len(msg.Media) > 0 {
 					notifyMsg := bus.OutboundMessage{
 						Channel:  msg.Channel,
@@ -122,7 +123,7 @@ func (m *Manager) WebhookHandlers() []WebhookRoute {
 }
 
 // SendToChannel delivers a message to a specific channel by name.
-func (m *Manager) SendToChannel(ctx context.Context, channelName, chatID, content string) error {
+func (m *Manager) SendToChannel(ctx context.Context, channelName, chatID, senderID, content string) error {
 	m.mu.RLock()
 	channel, exists := m.channels[channelName]
 	m.mu.RUnlock()
@@ -133,12 +134,42 @@ func (m *Manager) SendToChannel(ctx context.Context, channelName, chatID, conten
 
 	msg := bus.OutboundMessage{
 		Channel: channelName,
+		SenderID: senderID,
 		ChatID:  chatID,
 		Content: content,
 	}
 
 	return channel.Send(ctx, msg)
 }
+
+// // SendToChannel delivers a message to a specific channel by name.
+// func (m *Manager) SendToChannel(ctx context.Context, channelName, chatID, senderID, content string, metadata map[string]string) error {
+// 	m.mu.RLock()
+// 	channel, exists := m.channels[channelName]
+// 	m.mu.RUnlock()
+
+// 	if !exists {
+// 		return fmt.Errorf("channel %s not found", channelName)
+// 	}
+
+// 	msg := bus.OutboundMessage{
+// 		Channel:  channelName,
+// 		SenderID: senderID,
+// 		ChatID:   chatID,
+// 		Content:  content,
+// 		Metadata: metadata,
+// 	}
+
+// 	return channel.Send(ctx, msg)
+// }
+
+// ReplyToChannel sends a reply message to a specific channel.
+// func (m *Manager) ReplyToChannel(ctx context.Context, channelName, chatID, senderID, content string, replyToMessageID string) error {
+//     metadata := map[string]string{
+//         "reply_to": replyToMessageID,
+//     }
+//     return m.SendToChannel(ctx, channelName, chatID, senderID, content, metadata)
+// }
 
 // --- Send error notification helpers ---
 

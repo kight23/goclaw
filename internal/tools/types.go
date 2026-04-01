@@ -94,7 +94,7 @@ type BusAware interface {
 
 // ChannelSender abstracts sending a message to a channel.
 // Implemented by channels.Manager.SendToChannel.
-type ChannelSender func(ctx context.Context, channel, chatID, content string) error
+type ChannelSender func(ctx context.Context, channel, chatID, senderID, content string) error
 
 // ChannelSenderAware tools can receive a channel sender function.
 type ChannelSenderAware interface {

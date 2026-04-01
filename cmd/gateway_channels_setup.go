@@ -164,7 +164,7 @@ func wireChannelEventSubscribers(
 				Content:  msg,
 				Metadata: map[string]string{"group_id": chatID},
 			})
-		} else if err := channelMgr.SendToChannel(ctx, channel, chatID, msg); err != nil {
+		} else if err := channelMgr.SendToChannel(ctx, channel, chatID, "system", msg); err != nil {
 			slog.Warn("failed to send pairing approval notification", "channel", channel, "chatID", chatID, "error", err)
 		}
 	})

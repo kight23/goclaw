@@ -221,6 +221,17 @@ func (c *BaseChannel) HasAllowList() bool { return len(c.allowList) > 0 }
 // IsAllowed checks if a sender is permitted by the allowlist.
 // Supports compound senderID format: "123456|username".
 // Empty allowlist means all senders are allowed.
+func getBeforeAt(s string) string {
+	if atIdx := strings.Index(s, "@"); atIdx > 0 {
+		return s[:atIdx]
+	}
+	return s
+}
+
+// IsAllowed checks if a sender is permitted by the allowlist.
+// Supports compound senderID format: "123456|username".
+// Empty allowlist means all senders are allowed.
+// Handles WhatsApp LID format (@lid) by treating it like regular JID (@s.whatsapp.net).
 func (c *BaseChannel) IsAllowed(senderID string) bool {
 	if len(c.allowList) == 0 {
 		return true
@@ -234,6 +245,10 @@ func (c *BaseChannel) IsAllowed(senderID string) bool {
 		userPart = senderID[idx+1:]
 	}
 
+	// Normalize WhatsApp LID format (@lid -> @s.whatsapp.net for comparison)
+	normalizedSenderID := strings.Replace(senderID, "@lid", "@s.whatsapp.net", 1)
+	normalizedIdPart := strings.Replace(idPart, "@lid", "@s.whatsapp.net", 1)
+
 	for _, allowed := range c.allowList {
 		// Strip leading "@" from allowed value for username matching
 		trimmed := strings.TrimPrefix(allowed, "@")
@@ -243,14 +258,22 @@ func (c *BaseChannel) IsAllowed(senderID string) bool {
 			allowedID = trimmed[:idx]
 			allowedUser = trimmed[idx+1:]
 		}
-
+		senderIDtrimmed := getBeforeAt(senderID)
+		normalizedTrimmed := getBeforeAt(normalizedSenderID)
 		// Support either side using "id|username" compound form.
-		if senderID == allowed ||
+		slog.Debug("checking allowlist", "sender_id", senderID, "normalized_sender", normalizedSenderID, "id_part", idPart, "normalized_id_part", normalizedIdPart, "user_part", userPart, "allowed", allowed, "trimmed", trimmed, "allowed_id", allowedID, "allowed_user", allowedUser)
+		if senderIDtrimmed == allowed ||
+			normalizedTrimmed == allowed ||
 			idPart == allowed ||
-			senderID == trimmed ||
+			normalizedIdPart == allowed ||
+			senderIDtrimmed == trimmed ||
+			normalizedTrimmed == trimmed ||
 			idPart == trimmed ||
+			normalizedIdPart == trimmed ||
 			idPart == allowedID ||
-			(allowedUser != "" && senderID == allowedUser) ||
+			normalizedIdPart == allowedID ||
+			(allowedUser != "" && senderIDtrimmed == allowedUser) ||
+			(allowedUser != "" && normalizedTrimmed == allowedUser) ||
 			(userPart != "" && (userPart == allowed || userPart == trimmed || userPart == allowedUser)) {
 			return true
 		}

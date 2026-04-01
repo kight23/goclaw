@@ -135,8 +135,8 @@ func (t *MessageTool) Execute(ctx context.Context, args map[string]any) *Result 
 
 	// Prefer direct channel sender for immediate delivery.
 	// For group chats, fall through to message bus which supports metadata.
-	if t.sender != nil && !isGroupContext(ctx) {
-		if err := t.sender(ctx, channel, target, message); err != nil {
+		if t.sender != nil && !isGroupContext(ctx) {
+		if err := t.sender(ctx, channel, target, "agent", message); err != nil {
 			return ErrorResult(fmt.Sprintf("failed to send message: %v", err))
 		}
 		return SilentResult(fmt.Sprintf(`{"status":"sent","channel":"%s","target":"%s"}`, channel, target))
@@ -160,7 +160,7 @@ func (t *MessageTool) Execute(ctx context.Context, args map[string]any) *Result 
 
 	// Last resort: direct sender without group metadata.
 	if t.sender != nil {
-		if err := t.sender(ctx, channel, target, message); err != nil {
+		if err := t.sender(ctx, channel, target, "agent", message); err != nil {
 			return ErrorResult(fmt.Sprintf("failed to send message: %v", err))
 		}
 		return SilentResult(fmt.Sprintf(`{"status":"sent","channel":"%s","target":"%s"}`, channel, target))

@@ -42,7 +42,7 @@ func retryHookFromContext(ctx context.Context) RetryHookFunc {
 // DefaultRetryConfig returns sensible defaults matching TS provider retry behavior.
 func DefaultRetryConfig() RetryConfig {
 	return RetryConfig{
-		Attempts: 3,
+		Attempts: 6,
 		MinDelay: 300 * time.Millisecond,
 		MaxDelay: 30 * time.Second,
 		Jitter:   0.1,

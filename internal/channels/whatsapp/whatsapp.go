@@ -106,12 +106,12 @@ func (c *Channel) Send(_ context.Context, msg bus.OutboundMessage) error {
 		"to":      msg.ChatID,
 		"content": msg.Content,
 	}
-
+	slog.Debug("sending whatsapp message to bridge", "msg", msg)
 	data, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("marshal whatsapp message: %w", err)
 	}
-
+	slog.Debug("sending whatsapp message to bridge", "data", string(data))
 	if err := c.conn.WriteMessage(websocket.TextMessage, data); err != nil {
 		return fmt.Errorf("send whatsapp message: %w", err)
 	}
@@ -193,7 +193,7 @@ func (c *Channel) listenLoop() {
 			slog.Warn("invalid whatsapp message JSON", "error", err)
 			continue
 		}
-
+		slog.Info("whatsapp message received from bridge", "raw", string(message))
 		msgType, _ := msg["type"].(string)
 		if msgType == "message" {
 			c.handleIncomingMessage(msg)
@@ -206,15 +206,30 @@ func (c *Channel) listenLoop() {
 func (c *Channel) handleIncomingMessage(msg map[string]any) {
 	ctx := context.Background()
 	ctx = store.WithTenantID(ctx, c.TenantID())
-	senderID, ok := msg["from"].(string)
-	if !ok || senderID == "" {
-		return
+
+	// Prefer explicit fields from bridge; keep old fallback for compatibility.
+	senderID, _ := msg["sender"].(string)
+	if senderID == "" {
+		senderID, _ = msg["from"].(string)
+	}
+	if senderID == "" {
+		senderID, _ = msg["pn"].(string)
 	}
 
 	chatID, _ := msg["chat"].(string)
 	if chatID == "" {
+		chatID, _ = msg["from"].(string)
+	}
+	if chatID == "" {
 		chatID = senderID
 	}
+
+	slog.Debug("processing whatsapp message", "sender_id", senderID, "chat_id", chatID, "content_preview", channels.Truncate(fmt.Sprint(msg["content"]), 50))
+
+	if senderID == "" || chatID == "" {
+		return
+	}
+
 
 	// WhatsApp groups have chatID ending in "@g.us"
 	peerKind := "direct"
@@ -236,7 +251,7 @@ func (c *Channel) handleIncomingMessage(msg map[string]any) {
 
 	// Allowlist check
 	if !c.IsAllowed(senderID) {
-		slog.Debug("whatsapp message rejected by allowlist", "sender_id", senderID)
+		slog.Debug("whatsapp message rejected by allowlist", "sender_id", senderID, "allowlist", c.config.AllowFrom)
 		return
 	}
 
@@ -259,7 +274,7 @@ func (c *Channel) handleIncomingMessage(msg map[string]any) {
 	if messageID, ok := msg["id"].(string); ok {
 		metadata["message_id"] = messageID
 	}
-	if userName, ok := msg["from_name"].(string); ok {
+	if userName, ok := msg["pushName"].(string); ok {
 		metadata["user_name"] = userName
 	}
 
@@ -268,7 +283,13 @@ func (c *Channel) handleIncomingMessage(msg map[string]any) {
 		"chat_id", chatID,
 		"preview", channels.Truncate(content, 50),
 	)
-
+	slog.Info("whatsapp message details",
+		"sender_id", senderID,
+		"chat_id", chatID,
+		"content", content,
+		"media_count", len(media),
+		"metadata", metadata,
+	)
 	// Collect contact for processed messages.
 	if cc := c.ContactCollector(); cc != nil {
 		cc.EnsureContact(ctx, c.Type(), c.Name(), senderID, senderID, metadata["user_name"], "", peerKind)
